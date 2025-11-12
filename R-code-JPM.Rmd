@@ -1,0 +1,894 @@
+---
+title: "AI-VF"
+output: html_document
+date: "2025-07-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(knitr)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+df_ori <- read_excel("20250725-Base-codeada-VF.xlsx") 
+```
+
+# ANÁLISIS SOBRE EL TRASFONDO DE LOS ASUNTOS SOMETIDOS A CONOCIMIENTO DE LA CORTE CONSTITUCIONAL
+
+## 1. Delitos objeto de investigación o juicio en los expedientes analizados
+
+En este ejercicio se procesó la variable DEL_COM. Dado que es una variable abierta que codifica los posibles delitos cometidos y que son objeto de investigación, está construida como una lista en donde cada delito se separa con punto y coma (";"). Lo primero que se hizo fue separar cada delito, teniendo en cuenta la estructura de la variable. Luego se modificaron para que todos comenzaran con minúscula y no hubiesen espacios adicionales entre palabras. A la tabla resultante se le agregó el conteo de menciones y se calculó el porcentaje correspondiente. 
+
+```{r, del_com}
+
+df_delitos_long <- df_ori %>%
+  mutate(row_id = row_number(),
+         DEL_COM = str_to_lower(DEL_COM)) %>%
+  separate_rows(DEL_COM, sep = ";") %>%
+  mutate(DEL_COM = str_trim(DEL_COM)) 
+
+df_delitos_wide <- df_delitos_long %>%
+  mutate(value = 1) %>%
+  pivot_wider(
+    id_cols = row_id,
+    names_from = DEL_COM,
+    names_prefix = "DEL_",
+    values_from = value,
+    values_fill = 0
+  ) %>%
+  select(-row_id)
+
+perc_delitos <- df_delitos_wide %>%
+  select(starts_with("DEL_")) %>%
+  summarise(across(everything(), ~ sum(.x, na.rm = TRUE))) %>% 
+  pivot_longer(everything(), names_to = "delito", values_to = "count") %>%
+  mutate(delito = str_remove(delito, "^DEL_")) %>% 
+  mutate(perc = round(100 * count / sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_delitos, caption = " ")
+
+```
+
+## 2. ¿Los hechos y delitos objeto de investigación o juicio constituyen posibles violaciones a derechos humanos o no?
+
+En este ejercicio se procesó la variable VIO_DH. Es una variable categórica que incluye tres opciones: "sí", "no" y "no aplica". Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada y se calculó el porcentaje correspondiente.
+
+```{r, vio_dh}
+
+perc_vio <- df_ori %>% 
+  group_by(VIO_DH) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_vio, caption = " ")
+
+```
+
+## 3. ¿Los delitos objeto de investigación o juicio ocurrieron en el marco de protestas o movilizaciones?
+
+En este ejercicio se procesó la variable VIO_PROT, cruzándola con la variable DEL_COM. VIO_PROT es una variable categórica que sólo incluye tres opciones: "sí", "no" y "no aplica". Se filtró la tabla de delitos creada en el ejercicio 1, de manera que sólo incluyera los expedientes donde se codificó "sí" en VIO_PROT. Se construyó una tabla que cuenta la cantidad de veces que cada delito es mencionado y se calculó el porcentaje correspondiente.
+
+```{r, del_com_prot}
+
+df_delitos_long_prot <- df_ori %>%
+  filter(VIO_PROT == "Sí") %>% 
+  mutate(row_id = row_number(),
+         DEL_COM = str_to_lower(DEL_COM)) %>%
+  separate_rows(DEL_COM, sep = ";") %>%
+  mutate(DEL_COM = str_trim(DEL_COM)) 
+
+df_delitos_wide_prot <- df_delitos_long_prot %>%
+  mutate(value = 1) %>%
+  pivot_wider(
+    id_cols = row_id,
+    names_from = DEL_COM,
+    names_prefix = "DEL_",
+    values_from = value,
+    values_fill = 0
+  ) %>%
+  select(-row_id)
+
+perc_delitos_prot <- df_delitos_wide_prot %>%
+  select(starts_with("DEL_")) %>%
+  summarise(across(everything(), ~ sum(.x, na.rm = TRUE))) %>% 
+  pivot_longer(everything(), names_to = "delito", values_to = "count") %>%
+  mutate(delito = str_remove(delito, "^DEL_")) %>% 
+  mutate(perc = round(100 * count / sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_delitos_prot, caption = " ")
+
+```
+
+## 4. Institución de la Fuerza Pública a la que pertenecían las personas que estaban siendo investigadas o juzgadas
+
+En este ejercicio se procesó la variable INST_IMPL. Es una variable categórica que un listado limitado de opciones referidas a la institución de la Fuerza Pública a la que pertenecían las personas que estaban siendo investigadas o juzgadas. Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada y se calculó el porcentaje correspondiente.
+
+```{r, inst_impl}
+
+perc_inst_impl <- df_ori %>% 
+  group_by(INST_IMPL) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_inst_impl, caption = " ")
+
+```
+
+## 5. ¿A cuál institución de la Fuerza Pública pertenecían las personas investigadas o juzgadas por hechos y delitos ocurridos en el marco de protestas o movilizaciones? INST_IMPL x VIO_PRO "Sí"
+
+En este ejercicio se procesó la variable VIO_PROT, cruzándola con la variable INST_IMPL. VIO_PROT es una variable categórica que sólo incluye tres opciones: "sí", "no" y "no aplica". Se filtró la tabla de instituciones de la Fuerza Pública creada en el ejercicio 5, de manera que sólo incluyera los expedientes donde se codificó "sí" en VIO_PROT. Se construyó una tabla que cuenta la cantidad de veces que cada delito es mencionado y se calculó el porcentaje correspondiente.
+
+```{r, inst_impl_prot}
+
+perc_inst_impl_prot <- df_ori %>% 
+  filter(VIO_PROT == "Sí") %>% 
+  group_by(INST_IMPL) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_inst_impl_prot, caption = " ")
+
+```
+
+# ANÁLISIS SOBRE LA ARGUMENTACIÓN DE LOS OPERADORES JUDICIALES QUE PARTICIPAN EN LOS CONFLICTOS DE JURISDICCIÓN
+
+## 6. ¿Cuál operador judicial defendió la competencia de la justicia penal ordinaria y la Corte Constitucional decidió a su favor? 
+
+En este ejercicio se procesó la variable OPER_RAZ, filtrada por el registro de SENT_DEC "Favorable ordinaria". OPER_RAZ es una variable categórica que incluye cinco opciones: "ORD_ORD", "ORD_JPM", "JPM_JPM", "JPM_ORD" y "No aplica". Al filtrar según el sentido de decisión "Favorable ordinaria" quedan sólo entradas correspondientes a "ORD_ORD" y "JPM_ORD". Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_ord}
+
+df_sent_dec_ord <- df_ori %>% 
+  filter(SENT_DEC == "Favorable ordinaria") 
+
+perc_sent_dec_ord <- df_sent_dec_ord %>% 
+  group_by(OPER_RAZ) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_ord, caption = " ")
+
+```
+
+## 7. ¿Cuál operador judicial defendió la competencia de la justicia penal militar y la Corte Constitucional decidió a su favor?  
+
+En este ejercicio se procesó la variable OPER_RAZ, filtrada por el registro de SENT_DEC "Favorable penal militar". OPER_RAZ es una variable categórica que incluye cinco opciones: "ORD_ORD", "ORD_JPM", "JPM_JPM", "JPM_ORD" y "No aplica". Al filtrar según el sentido de decisión "Favorable penal militar" quedan sólo entradas correspondientes a "ORD_JPM" y "JPM_JPM". Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_jpm_oper}
+
+df_sent_dec_ord <- df_ori %>% 
+  filter(SENT_DEC == "Favorable penal militar") 
+
+perc_sent_dec_ord <- df_sent_dec_ord %>% 
+  group_by(OPER_RAZ) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_ord, caption = " ")
+
+```
+
+## 8. ¿Cuál operador judicial defendió la competencia de la justicia penal ordinaria en casos de posibles violaciones a derechos humanos y la Corte Constitucional decidió a su favor? 
+
+En este ejercicio se procesó la variable OPER_RAZ, filtrada por el registro de SENT_DEC "Favorable ordinaria" y por el registro de VIO_DH "sí". OPER_RAZ es una variable categórica que incluye cinco opciones: "ORD_ORD", "ORD_JPM", "JPM_JPM", "JPM_ORD" y "No aplica" y VIO_DH es una variable categórica que incluye tres opciones: "sí", "no" y "no aplica". Al filtrar según el sentido de decisión "Favorable ordinaria" quedan sólo entradas correspondientes a "ORD_ORD" y "JPM_ORD". Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada cuando se suma el filtro por VIO_DH "sí" y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_ord_vio}
+
+df_sent_dec_ord <- df_ori %>% 
+  filter(SENT_DEC == "Favorable ordinaria") %>% 
+  filter(VIO_DH == "Sí") 
+
+perc_sent_dec_ord <- df_sent_dec_ord %>% 
+  group_by(OPER_RAZ) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_ord, caption = " ")
+
+```
+
+## 9. ¿Cuál operador judicial defendió la competencia de la justicia penal militar en casos de posibles violaciones a derechos humanos y la Corte Constitucional decidió a su favor? 
+
+En este ejercicio se procesó la variable OPER_RAZ, filtrada por el registro de SENT_DEC "Favorable penal militar" y por el registro de VIO_DH "sí". OPER_RAZ es una variable categórica que incluye cinco opciones: "ORD_ORD", "ORD_JPM", "JPM_JPM", "JPM_ORD" y "No aplica" y VIO_DH es una variable categórica que incluye tres opciones: "sí", "no" y "no aplica". Al filtrar según el sentido de decisión "Favorable ordinaria" quedan sólo entradas correspondientes a "ORD_JPM" y "JPM_JPM". Se construyó una tabla que cuenta la cantidad de veces que cada categoría es mencionada cuando se suma el filtro por VIO_DH "sí" y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_jpm}
+
+df_sent_dec_jpm <- df_ori %>% 
+  filter(SENT_DEC == "Favorable penal militar") %>% 
+  filter(VIO_DH == "Sí") 
+
+perc_sent_dec_jpm <- df_sent_dec_jpm %>% 
+  group_by(OPER_RAZ) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_jpm, caption = " ")
+
+```
+
+# ANÁLISIS SOBRE LAS DECISIONES ADOPTADAS POR LA CORTE CONSTITUCIONAL EN LOS CONFLICTOS DE JURISDICCIÓN
+
+## 10. Sentido de la decisión adoptada por la Corte Constitucional en cada expediente
+
+En este ejercicio se procesó la variable SENT_DEC. SENT_DEC es una variable categórica que incluye un listado limitado de opciones referidas al sentido de la decisión adoptada por la Corte Constitucional en cada uno de los expedientes. Se construyó una tabla donde se cuenta la cantidad de veces que es mencionada cada categoría y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec}
+
+perc_sent_dec <- df_ori %>% 
+  group_by(SENT_DEC) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec, caption = " ")
+
+```
+
+## 11. Sentido de la decisión adoptada por la Corte Constitucional en cada expediente cuando se discuten posibles violaciones a derechos humanos
+
+En este ejercicio se procesó la variable SENT_DEC, cruzándola con la variable VIO_DH. VIO_DH es una variable categórica que sólo incluye tres opciones: "sí", "no" y "no aplica". Se filtró la tabla de sentidos de la decisión adoptados por la Corte Constitucional en cada expediente creada en el ejercicio 11, de manera que sólo incluyera los expedientes donde se codificó "sí" en VIO_DH. Se construyó una tabla que cuenta la cantidad de veces que cada delito es mencionado y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_vio_dh}
+
+perc_sent_dec_vio_dh <- df_ori %>% 
+  filter(VIO_DH == "Sí") %>% 
+  group_by(SENT_DEC) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_vio_dh, caption = " ")
+
+```
+
+## 12. Sentido de la decisión adoptada por la Corte Constitucional en cada expediente cuando se discuten hechos y delitos que posiblemente ocurrieron en el marco de protestas o movilizaciones
+
+En este ejercicio se procesó la variable SENT_DEC, cruzándola con la variable VIO_PROT. VIO_PROT es una variable categórica que sólo incluye tres opciones: "sí", "no" y "no aplica". Se filtró la tabla de sentidos de la decisión adoptados por la Corte Constitucional en cada expediente creada en el ejercicio 11, de manera que sólo incluyera los expedientes donde se codificó "sí" en VIO_PROT. Se construyó una tabla que cuenta la cantidad de veces que cada delito es mencionado y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_vio_prot}
+
+perc_sent_dec_vio_prot <- df_ori %>% 
+  filter(VIO_PROT == "Sí") %>% 
+  group_by(SENT_DEC) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_sent_dec_vio_prot, caption = " ")
+
+```
+
+## 13. Sentido de la decisión de la Corte Constitucional para expedientes donde se discuten posibles delitos de homicidio o lesiones personales
+
+En este ejercicio se procesó la variable SENT_DEC, cruzándola con la variable DEL_COM cuando esta última se refiriera a delitos de homicidio y lesiones personales. SENT_DEC es una variable categórica que incluye un listado limitado de opciones referidas al sentido de la decisión adoptada por la Corte Constitucional en cada uno de los expedientes. Se construyeron dos tables, una para homicidio y otra para lesiones personales. En cada table se cuenta la cantidad de veces que es mencionada cada categoría de SENT_DEC y se calculó el porcentaje correspondiente.
+
+```{r, sent_dec_hom}
+
+df_delitos_long_hom <- df_delitos_long %>% 
+  filter(DEL_COM != "tentativa de homicidio") %>% 
+  filter(DEL_COM != "homicidio culposo") %>% 
+  filter(DEL_COM == "homicidio") 
+
+perc_hom_sent_dec <- df_delitos_long_hom %>% 
+  group_by(SENT_DEC) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_hom_sent_dec, caption = " ")
+
+```
+
+```{r, sent_dec_les}
+
+df_delitos_long_hom <- df_delitos_long %>% 
+  filter(DEL_COM != "lesiones personales culposas") %>% 
+  filter(DEL_COM == "lesiones personales") 
+
+perc_les_sent_dec <- df_delitos_long_hom %>% 
+  group_by(SENT_DEC) %>% 
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(perc = round(100 * count/sum(count), 1)) %>% 
+  arrange(desc(perc))
+
+knitr::kable(perc_les_sent_dec, caption = " ")
+
+```
+
+# ANÁLISIS DE TIEMPOS ASOCIADOS A LA DEFINICIÓN DE COMPETENCIA EN CASOS DE CONFLICTO DE JURISDICCIÓN ENTRE LA JUSTICIA PENAL ORDINARIA Y LA JUSTICIA PENAL MILITAR
+
+## 14. Preparación del análisis
+
+Las variables de fecha incluidas en la base de datos original se filtraron para no considerar las entradas codificadas como "no aplica" y "no registra". 
+
+Cada fecha fue considerada como parte de un continuo de tiempo, se le asignó una etiqueta y se realizó un conteo de días transcurridos entre esa fecha y la siguiente, de la siguiente manera:
+
+- DAYS_1_to_2 cuenta los días transcurridos entre la fecha de radicación en la Corte Constitucional y la fecha de reparto al despacho sustanciador; 
+
+- DAYS_2_to_3 cuenta los días transcurridos entre la fecha de reparto al despacho sustanciador y la fecha en que se presentó el proyecto de auto; 
+
+- DAYS_3_to_4 cuenta los días transcurridos entre la fecha en que se presentó el proyecto de auto y la fecha en que la Sala Plena de la Corte Constitucional adoptó una decisión; 
+
+- DAYS_4_to_5 cuenta los días transcurridos entre la fecha en que la Sala Plena de la Corte Constitucional adoptó una decisión y la fecha en que se notificó la decisión en estados; 
+
+- DAYS_5_to_6 cuenta los días transcurridos entre la fecha en que se notificó la decisión en estados y la fecha en que se remitió el expediente al operador judicial correspondiente;
+- DAYS_hecho_to_6 cuenta los días transcurridos entre la fecha en que ocurrieron los hechos y la fecha en que se remitió el expediente al operador judicial correspondiente y, 
+
+- DAYS_hecho_to_0 cuenta los días transcurridos entre la fecha en que ocurrieron los hechos y la fecha en que un operador judicial declaró la existencia del conflicto de jurisdicción y ordenó remitirlo a la Corte Constitucional para decisión.
+
+Las variables FECHA_HEC y FECHA_DECLARA no son registradas por la Secretaría de la Corte Constitucional, sino que pueden o no ser incluidas por los despachos sustanciadores dentro del texto de la decisión adoptada. Esto no siempre ocurre y, por lo tanto, es necesario filtrar los datos para excluir los expedientes donde se codificó la categoría "no registra". Esta es una de las limitaciones de los análisis donde se usaron como referencia estas dos variables.
+
+Además, se excluyeron también los datos de los expedientes donde se codificó la categoría "no aplica" en todas las variables contentivas de fechas. Estos corresponden a 3 expedientes que fueron anulados y 2 que aún estaban pendientes de decisión.
+
+```{r, set_up_fechas}
+
+ai_fig_width <- 5.49 
+ai_fig_height <- 4.5
+
+ai_fig_height_tall <- 7.5
+
+df_fechas <- df_ori %>% 
+  mutate(across(
+    .cols = starts_with("FECHA"),
+    ~ case_when(
+      as.character(.) %in% c("No aplica", "No registra") ~ NA_Date_,
+      TRUE ~ as.Date(as.character(.), format = "%Y/%m/%d")
+    )
+  ))
+
+df_fechas$anio_inicio <- year(df_fechas$FECHA_RAD)
+
+df_fechas <- df_fechas %>% 
+  mutate(
+    DAYS_1_to_2 = as.numeric(FECHA_REP - FECHA_RAD),
+    DAYS_2_to_3 = as.numeric(FECHA_PRO - FECHA_REP),
+    DAYS_3_to_4 = as.numeric(FECHA_DEC - FECHA_PRO),
+    DAYS_4_to_5 = as.numeric(FECHA_NOT - FECHA_DEC),
+    DAYS_5_to_6 = as.numeric(FECHA_REM_DEF - FECHA_NOT),
+    DIAS_1_to_6 = as.numeric(FECHA_REM_DEF - FECHA_RAD),
+    DIAS_0_to_1 = as.numeric(FECHA_RAD - FECHA_DECLARA),
+    DIAS_hecho_to_6 = as.numeric(FECHA_REM_DEF - FECHA_HEC),
+    DIAS_hecho_to_0 = as.numeric(FECHA_DECLARA - FECHA_HEC),
+  ) 
+```
+
+## 15. Año en que ocurrieron los hechos objeto de investigación o juicio
+
+En este ejercicio se procesó la variable FECHA_HEC, correspondiente a la fecha en que ocurrieron los hechos objeto de investigación o juicio. Se construyó una tabla que cuenta la cantidad de veces que cada año de ocurrencia de los hechos es mencionado y se graficó utilizando ese año como eje X y la frecuencia como eje Y. Las fechas que no fueron registradas o donde se codificó como "no aplica" fueron eliminadas.
+
+```{r, fecha_hec}
+
+ai_text_size <- 6
+ai_geom_text_size <- 3.5
+
+df_hechos <- df_fechas %>% 
+  filter(!is.na(FECHA_HEC)) %>% 
+  mutate(FECHA_HEC = as.Date(FECHA_HEC)) %>% 
+  filter(!is.na(FECHA_HEC)) %>% 
+  mutate(anio_hechos = year(FECHA_HEC))  %>%
+  count(anio_hechos)
+
+Gráfico_1 <- 
+ggplot(df_hechos, aes(x = as.factor(anio_hechos), y = n)) +
+  geom_col(fill = "#ffff00", color="black") +
+  geom_text(aes(label = n), vjust = -0.5, color = "black", size = 3) +
+  labs(
+    x = "Año inicio",
+    y = "Expedientes") +
+    theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico1.png", Gráfico_1,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_1)
+
+```
+
+## 16. Promedio de días transcurridos entre la fecha de los hechos objeto de investigación o juicio y la fecha de remisión definitiva del expediente por parte de la Corte Constitucional al operador judicial correspondiente, distribuido por año de radicación del expediente en la Corte Constitucional
+
+En este ejercicio se procesaron las variables FECHA_HEC y FECHA_REM_DEF, correspondientes a la fecha en que ocurrieron los hechos objeto de investigación o juicio y a la fecha en que el expediente fue remitido por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas. Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, avg_days_per_year}
+
+ avg_days_per_year <- df_fechas %>%
+  filter(!is.na(FECHA_HEC)) %>%
+  group_by(anio_inicio) %>%
+  summarise(avg_days = round(mean(DIAS_hecho_to_6, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_2 <- 
+ggplot(avg_days_per_year, aes(x = anio_inicio, y = avg_days)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico2.png", Gráfico_2,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_2)
+
+```
+
+## 17. Promedio de días transcurridos entre la fecha de los hechos objeto de investigación o juicio y la fecha de remisión definitiva del expediente por parte de la Corte Constitucional al operador judicial correspondiente, distribuido por año de radicación del expediente en la Corte Constitucional y por el sentido agrupado de la decisión adoptada
+
+En este ejercicio se procesaron las variables FECHA_HEC y FECHA_REM_DEF, correspondientes a la fecha en que ocurrieron los hechos objeto de investigación o juicio y a la fecha en que el expediente fue remitido por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas. Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y por el sentido agrupado de la decisión adoptada. Finalmente, se construyeron cuatro gráficos, uno por año de radicación, tomando el sentido agrupado de la decisión como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+El sentido agrupado de la decisión es una variable no presente en la base de datos original que agrupa las categorías contenidas en la variable SENT_DEC de la siguiente manera:
+
+- En la categoría "decisión de fondo" se agrupan los sentidos de la decisión correspondientes a "favorable ordinaria" y "favorable penal militar" de la variable SENT_DEC. Es decir, se agrupan los sentidos de la decisión que implicaron una definición de cuál operador judicial debía retener la competencia sobre el caso.
+
+- En la categoría "ihibición" se agrupan todos los demás sentidos de la decisión que incluyen la palabra "inhibición", a excepción de "cosa juzgada" y "no aplica". Es decir, se agrupan los sentidos de la decisión que implicaron que la Corte Constitucional no adoptara una decisión sobre cuál operador judicial debía retener la competencia sobre el caso.
+
+```{r, fecha_hec_rem_def}
+
+ avg_days_per_year_sent <- df_fechas %>%
+    mutate(DECISION_RES = case_when(
+    SENT_DEC == 'Favorable ordinaria' ~ 'Decisión de fondo',
+    SENT_DEC == 'Favorable penal militar' ~ 'Decisión de fondo',
+    SENT_DEC == 'Cosa juzgada' ~ 'Cosa juzgada',
+    SENT_DEC == 'No aplica' ~ 'No aplica',
+    TRUE ~ 'Inhibición')) %>% 
+  filter(DECISION_RES != "No aplica") %>% 
+  filter(DECISION_RES != "Cosa juzgada") %>% 
+  group_by(DECISION_RES, anio_inicio) %>%
+  summarise(avg_days = round(mean(DIAS_hecho_to_6, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year_sent , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_3 <- 
+ggplot(avg_days_per_year_sent, aes(x = DECISION_RES, y = avg_days)) +
+  facet_wrap(~ anio_inicio) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días"
+  ) +
+  ylim(0, 4000) +
+  theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico3.png", Gráfico_3,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_3)
+```
+
+## 18. Promedio de días transcurridos entre la fecha de los hechos objeto de investigación o juicio y la fecha de declaración de la existencia de un conflicto de jurisdicción, distribuido por año de radicación del expediente en la Corte Constitucional
+
+En este ejercicio se procesaron las variables FECHA_HEC y FECHA_DECLARA, correspondientes a la fecha en que ocurrieron los hechos objeto de investigación o juicio y a la fecha en que un operador declaró la existencia de un conflicto de jurisdicción y ordenó remitirlo a la Corte Constitucional (o a otro operador a cargo de definir el conflicto). Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas. Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, avg_days_per_year_declara}
+
+ avg_days_per_year_declara <- df_fechas %>%
+  filter(!is.na(FECHA_HEC)) %>% 
+  filter(!is.na(FECHA_DECLARA)) %>%
+  group_by(anio_inicio) %>%
+  summarise(avg_days_declara = round(mean(DIAS_hecho_to_0, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year_declara , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_4 <- 
+ggplot(avg_days_per_year_declara, aes(x = anio_inicio, y = avg_days_declara)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days_declara, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días desde la declaración del conflicto"
+  ) +
+  ylim(0,2500) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico4.png", Gráfico_4,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_4)
+```
+
+## 19. Promedio de días transcurridos entre la fecha de los hechos objeto de investigación o juicio y la fecha de declaración de la existencia de un conflicto de jurisdicción, distribuido por año de radicación del expediente en la Corte Constitucional y filtrando los casos de posibles violaciones a derechos humanos
+
+En este ejercicio se procesaron las variables FECHA_HEC y FECHA_DECLARA, correspondientes a la fecha en que ocurrieron los hechos objeto de investigación o juicio y a la fecha en que un operador declaró la existencia de un conflicto de jurisdicción y ordenó remitirlo a la Corte Constitucional (o a otro operador a cargo de definir el conflicto). Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas y se filtró la información para considerar sólo la que contenía en la variable VIO_DH la categoría "sí". Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, fecha_hec_declara_si}
+
+ avg_days_per_year_declara_si <- df_fechas %>%
+  filter(!is.na(FECHA_HEC)) %>%
+  filter(! is.na(FECHA_DECLARA)) %>% 
+  filter(VIO_DH == "Sí") %>% 
+  group_by(anio_inicio) %>%
+  summarise(avg_days_declara = round(mean(DIAS_hecho_to_0, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year_declara_si, caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_5 <- 
+ggplot(avg_days_per_year_declara_si, aes(x = anio_inicio, y = avg_days_declara)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days_declara, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días desde la declaración del conflicto"
+  ) +
+  ylim(0,2500) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico5.png", Gráfico_5,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_5)
+```
+
+## 20. Promedio de días transcurridos entre la fecha de declaración de la existencia de un conflicto de jurisdicción y la fecha de radicación del expediente en la Corte Constitucional, distribuido por año de radicación del expediente en la Corte Constitucional
+
+En este ejercicio se procesaron las variables FECHA_DECLARA y FECHA_RAD, correspondientes a la fecha en que un operador declaró la existencia de un conflicto de jurisdicción y ordenó remitirlo a la Corte Constitucional (o a otro operador a cargo de definir el conflicto) y la fecha en que se radicó el expediente en la Corte Constitucional. Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas. Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, avg_days_per_year_rad_declara}
+
+ avg_days_per_year_rad_declara <- df_fechas %>%
+  filter(! is.na(FECHA_DECLARA)) %>% 
+  group_by(anio_inicio) %>%
+  summarise(avg_days_rad_declara = round(mean(DIAS_0_to_1, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year_rad_declara , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_6 <- 
+ggplot(avg_days_per_year_rad_declara, aes(x = anio_inicio, y = avg_days_rad_declara)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days_rad_declara, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días desde la declaración del conflicto hasta la radicación"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico6.png", Gráfico_6,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_6)
+```
+
+## 21. Promedio de días transcurridos entre la fecha de declaración de la existencia de un conflicto de jurisdicción y la fecha de radicación del expediente en la Corte Constitucional, distribuido por año de radicación del expediente en la Corte Constitucional y filtrando los casos de posibles violaciones a derechos humanos
+
+En este ejercicio se procesaron las variables FECHA_DECLARA y FECHA_RAD, correspondientes a la fecha en que un operador declaró la existencia de un conflicto de jurisdicción y ordenó remitirlo a la Corte Constitucional (o a otro operador a cargo de definir el conflicto) y la fecha en que se radicó el expediente en la Corte Constitucional. Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas y se filtró la información para considerar sólo la que contenía en la variable VIO_DH la categoría "sí". Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, avg_days_per_year_rad_declara_vio_dh}
+
+ avg_days_per_year_rad_declara <- df_fechas %>%
+  filter(! is.na(FECHA_DECLARA)) %>% 
+  filter(VIO_DH == "Sí") %>% 
+  group_by(anio_inicio) %>%
+  summarise(avg_days_rad_declara = round(mean(DIAS_0_to_1, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year_rad_declara , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_7 <- 
+ggplot(avg_days_per_year_rad_declara, aes(x = anio_inicio, y = avg_days_rad_declara)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days_rad_declara, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días desde la declaración del conflicto hasta la radicación"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico7.png", Gráfico_7,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_7)
+```
+
+# 6.2.3.2
+
+## 22. Promedio de días transcurridos entre la fecha de declaración de la existencia de un conflicto de jurisdicción y la fecha de radicación del expediente en la Corte Constitucional, distribuido por año de radicación del expediente en la Corte Constitucional FECHA_RAD vs FECHA_REM_DEF (x año FECHA_RAD)
+
+En este ejercicio se procesaron las variables FECHA_RAD y FECHA_REM_DEF, correspondientes a la fecha en que se radicó el expediente en la Corte Constitucional y la fecha en que el expediente fue remitido por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. Se contó en días el tiempo que pasó en cada expediente entre esas dos fechas. Se construyó una tabla donde se promedia el tiempo transcurrido, distribuyendo los expedientes por el año en que fueron radicados en la Corte Constitucional (FECHA_RAD) y se graficó tomando el año de radicación como el eje X y el promedio de tiempo transcurrido entre las dos etapas como el eje Y.
+
+```{r, avg_days_per_year_fecha_rad}
+
+ avg_days_per_year <- df_fechas %>%
+  filter(!is.na(anio_inicio)) %>% 
+  group_by(anio_inicio) %>%
+  summarise(avg_days = round(mean(DIAS_1_to_6, na.rm = TRUE), 0))
+
+knitr::kable(avg_days_per_year , caption = " ")
+
+
+# Plot with ggplot2
+Gráfico_8 <- 
+ggplot(avg_days_per_year, aes(x = anio_inicio, y = avg_days)) +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(avg_days, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  labs(
+    title = " ",
+    x = "Año de radicación",
+    y = "Promedio de días"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico8.png", Gráfico_8,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_8)
+```
+
+### 23. Distribución del tiempo transcurrido durante cada etapa del trámite de un conflicto de jurisdicción en la Corte Constitucional, distribuido por año de radicación del expediente
+
+En este ejercicio se procesaron las variables FECHA_RAD, FECH_REP, FECHA_PRO, FECHA_DEC, FECHA_NOT y FECHA_REM_DEF, correspondientes a las seis etapas principales del trámite de un conflicto de jurisdicción ante la Corte Constitucional, en este orden: (i) radicación del expediente en la Secretaría de la Corte Constitucional; (ii) reparto al despacho de la Corte Constitucional que sustanciará el expediente; (iii) presentación del proyecto de fallo para discusión en la Sala Plena de la Corte Constitucional; (iv) decisión de la Sala Plena de la Corte Constitucional; (v) notificación de la decisión adoptada por estados y, (vi) remisión del expediente por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. 
+
+La distribución de los tiempos transcurridos entre cada etapa se insertaron en cuatro gráficos de tipo "box plot", uno para cada año de radicación de los expedientes.
+
+```{r, boxplot}
+
+df_long <- df_fechas %>%
+  filter(anio_inicio != is.na(anio_inicio)) %>% 
+  select(ID_CASO, anio_inicio, starts_with("DAYS_")) %>%
+  pivot_longer(
+    cols = starts_with("DAYS_"),
+    names_to = "Moment",
+    values_to = "Days"
+  )
+
+# Clean up Moment labels
+df_long$Moment <- gsub("DAYS_", "", df_long$Moment)
+
+# Plot
+
+Gráfico_9 <- 
+ggplot(df_long, aes(x = Moment, y = Days)) +
+  geom_boxplot(fill = "#ffff00") +
+  facet_wrap(~ anio_inicio) +
+  labs(
+    title = " ",
+    x = " ",
+    y = "Días") +
+  scale_x_discrete(labels = c("1_to_2" = "Rad/\nRep",
+                   "2_to_3" = "Rep/\nProy. Auto",
+                   "3_to_4" = "Proy. Auto/\nDec.",
+                   "4_to_5" = "Dec./\nNot.",
+                   "5_to_6" = "Not./\nRem. Def.")) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico9.png", Gráfico_9,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_9)
+```
+
+
+### 24. Distribución del tiempo transcurrido durante cada etapa del trámite de un conflicto de jurisdicción en la Corte Constitucional, distribuido por el sentido agrupado de la decisión adoptada
+
+En este ejercicio se procesaron las variables FECHA_RAD, FECH_REP, FECHA_PRO, FECHA_DEC, FECHA_NOT y FECHA_REM_DEF, correspondientes a las seis etapas principales del trámite de un conflicto de jurisdicción ante la Corte Constitucional, en este orden: (i) radicación del expediente en la Secretaría de la Corte Constitucional; (ii) reparto al despacho de la Corte Constitucional que sustanciará el expediente; (iii) presentación del proyecto de fallo para discusión en la Sala Plena de la Corte Constitucional; (iv) decisión de la Sala Plena de la Corte Constitucional; (v) notificación de la decisión adoptada por estados y, (vi) remisión del expediente por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. 
+
+La distribución de los tiempos transcurridos entre cada etapa se insertaron en dos gráficos de tipo "box plot", uno para cada tipo de sentido agrupado de la decisión adoptada.
+
+El sentido agrupado de la decisión es una variable no presente en la base de datos original que agrupa las categorías contenidas en la variable SENT_DEC de la siguiente manera:
+
+- En la categoría "decisión de fondo" se agrupan los sentidos de la decisión correspondientes a "favorable ordinaria" y "favorable penal militar" de la variable SENT_DEC. Es decir, se agrupan los sentidos de la decisión que implicaron una definición de cuál operador judicial debía retener la competencia sobre el caso.
+
+- En la categoría "ihibición" se agrupan todos los demás sentidos de la decisión que incluyen la palabra "inhibición", a excepción de "cosa juzgada" y "no aplica". Es decir, se agrupan los sentidos de la decisión que implicaron que la Corte Constitucional no adoptara una decisión sobre cuál operador judicial debía retener la competencia sobre el caso.
+
+```{r, boxplot_sentido_Dec}
+
+df_long <- df_fechas %>%
+   mutate(DECISION_RES = case_when(
+    SENT_DEC == 'Favorable ordinaria' ~ 'Decisión de fondo',
+    SENT_DEC == 'Favorable penal militar' ~ 'Decisión de fondo',
+    SENT_DEC == 'Cosa juzgada' ~ 'Cosa juzgada',
+    SENT_DEC == 'No aplica' ~ 'No aplica',
+    TRUE ~ 'Inhibición')) %>% 
+  filter(DECISION_RES != "No aplica") %>% 
+  filter(DECISION_RES != "Cosa juzgada") %>% 
+  select(ID_CASO, DECISION_RES, starts_with("DAYS_")) %>% 
+  pivot_longer(
+    cols = starts_with("DAYS_"),
+    names_to = "Moment",
+    values_to = "Days"
+  )
+
+# Clean up Moment labels
+df_long$Moment <- gsub("DAYS_", "", df_long$Moment)
+
+
+
+# Plot
+
+Gráfico_10 <- 
+ggplot(df_long, aes(x = Moment, y = Days)) +
+  geom_boxplot(fill = "#ffff00") +
+  facet_wrap(~ DECISION_RES) +
+  labs(
+    title = " ",
+    x = " ",
+    y = "Días") +
+  scale_x_discrete(labels = c("1_to_2" = "Rad/\nRep",
+                   "2_to_3" = "Rep/\nProy. Auto",
+                   "3_to_4" = "Proy. Auto/\nDec.",
+                   "4_to_5" = "Dec./\nNot.",
+                   "5_to_6" = "Not./\nRem. Def.")) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico10.png", Gráfico_10,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_10)
+```
+
+### 25. Promedio de tiempo transcurrido entre la llegada del primer expediente y la salida del último expediente en eventos donde un caso pasa más de una vez por la Corte Constitucional para la definición del mismo conflicto de jurisdicción RET_CCONS
+
+En este ejercicio se procesaron las variables FECHA_RAD y FECHA_REM_DEF, correspondientes a la fecha de radicación del expediente en la Corte Constitucional y la fecha de remisión del expediente por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción. La información se filtró según la variable RET_CCONS, que identifica los expedientes que se refieren a los mismos hechos y los agrupa y se excluyeron los expedientes que estaban codificados en esta variable como "no aplica", pues significa que no han retornado a la Corte Constitucional.
+
+Cada grupo de expedientes que se refiere a los mismos hechos está identificado dentro de la variable RET_CCONS con una categoría propia, consecutiva. De manera que, el primer caso que retorno es RET_1, el segundo RET_2 y así sucesivamente. Lo primero que se hizo fue filtrar los "no aplica"; luego se agruparon los expedientes según el identificador consecutivo, es decir, los expedientes RET_1 juntos, los RET_2 juntos, y así sucesivamente. Después se calculó el tiempo transcurrido entre la a fecha de radicación del expediente en la Corte Constitucional y la fecha de remisión del expediente por la Corte Constitucional al operador judicial correspondiente luego de resolver el conflicto de jurisdicción de cada grupo de casos, tomando como extremo inicial la fecha de radicación del primer expediente y como extremo final la fecha de remisión del último expediente.
+
+Los totales de tiempo se promediaron y distribuyeron según el sentido agrupado de la decisión del último expediente y se gráficaron.
+
+El sentido agrupado de la decisión es una variable no presente en la base de datos original que agrupa las categorías contenidas en la variable SENT_DEC de la siguiente manera:
+
+- En la categoría "decisión de fondo" se agrupan los sentidos de la decisión correspondientes a "favorable ordinaria" y "favorable penal militar" de la variable SENT_DEC. Es decir, se agrupan los sentidos de la decisión que implicaron una definición de cuál operador judicial debía retener la competencia sobre el caso.
+
+- En la categoría "ihibición" se agrupan todos los demás sentidos de la decisión que incluyen la palabra "inhibición", a excepción de "cosa juzgada" y "no aplica". Es decir, se agrupan los sentidos de la decisión que implicaron que la Corte Constitucional no adoptara una decisión sobre cuál operador judicial debía retener la competencia sobre el caso.
+
+Además, también se presentó la distribución de tiempo transcurrido en un gráfico de tipo "box plot".
+
+Del análisis de tiempos se excluyeron los grupos de expedientes RET_10 y RET_11, pues no reflejan un escenario en que el conflicto de jurisdicción vuelve a la Corte Constitucional debido a una inhibición inicial.
+
+```{r, ret}
+
+df_max_fecha_rem_def <- df_fechas %>%
+      mutate(DECISION_RES = case_when(
+    SENT_DEC == 'Favorable ordinaria' ~ 'Decisión de fondo',
+    SENT_DEC == 'Favorable penal militar' ~ 'Decisión de fondo',
+    SENT_DEC == 'Cosa juzgada' ~ 'Cosa juzgada',
+    SENT_DEC == 'No aplica' ~ 'No aplica',
+    TRUE ~ 'Inhibición')) %>% 
+  filter(RET_CCONS != "No aplica") %>% 
+  filter(RET_CCONS != "RET_10") %>% 
+  filter(RET_CCONS != "RET_11") %>% 
+  group_by(RET_CCONS) %>% 
+  slice_max(order_by = FECHA_REM_DEF, n = 1, with_ties = FALSE) %>%
+  select(RET_CCONS, fecha_rem_def_max = FECHA_REM_DEF, decision_max = DECISION_RES)
+
+df_min_fecha_rad <- df_fechas %>%
+  filter(RET_CCONS != "No aplica") %>% 
+  filter(RET_CCONS != "RET_10") %>% 
+  filter(RET_CCONS != "RET_11") %>% 
+  group_by(RET_CCONS) %>% 
+  summarise(fecha_rad_min = min(FECHA_RAD))
+
+final_df <- df_min_fecha_rad  %>%
+  left_join(df_max_fecha_rem_def, by = c("RET_CCONS")) %>% 
+  mutate(days_diff = as.numeric(fecha_rem_def_max - fecha_rad_min))
+
+avg_days <- final_df %>%
+  group_by(decision_max) %>%
+  summarise(average_days_diff = round(mean(days_diff),0))
+
+Gráfico_11 <- 
+ggplot(avg_days, aes(x = decision_max, y = average_days_diff)) +
+  geom_bar(stat = "identity") +
+  geom_col(fill = "#ffff00", color="black") +
+   geom_text(
+    aes(label = round(average_days_diff, 0)),
+    vjust = -0.5, color = "black", size = 3) +
+  ylim(0, 700) + 
+  labs(
+    title = " ",
+    x = "Tipo de decisión",
+    y = "Promedio de días"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico11.png", Gráfico_11,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_11)
+```
+
+```{r, ret_box_plot}
+Gráfico_12 <- 
+ggplot(final_df, aes(x = decision_max, y = days_diff)) +
+  geom_boxplot(fill = "#ffff00") +
+  labs(
+    title = " ",
+    x = "Tipo de decisión",
+    y = "Días"
+  ) +
+theme_classic() +
+    theme(axis.text.y = element_text(size = ai_text_size),
+        axis.text.x = element_text(size = ai_text_size, vjust = 1),
+        axis.title = element_text(size = ai_text_size))
+
+ggsave("grafico12.png", Gráfico_12,  
+       width = ai_fig_width, height = ai_fig_height, dpi = 600)
+
+print(Gráfico_12)
+```
