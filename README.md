@@ -4,7 +4,7 @@ Este repositorio de GitHub acompaña el informe de Amnistía Internacional "_¿I
 
 ---
 
-# Insist, persist resist and never give up? Impact of the use of military criminal justice on impunity for human rights violations in Colombia
+# Insist, persist, resist and never give up? Impact of the use of military criminal justice on impunity for human rights violations in Colombia
 
 This GitHub repository accompanies Amnesty International’s report “_To Insist, Persist, Resist, and Never Desist? The Impact of Military Criminal Justice Intervention on Impunity for Human Rights Violations in Colombia_” and its methodological annex and codebook (Index Number AMR 23/0356/2025). One section of the report employs a data collection, processing, and analysis approach focused on judicial decisions issued by the Constitutional Court of Colombia, aimed at identifying the impact of Military Criminal Justice intervention in cases concerning potential human rights violations or international crimes. The methodology involved the manual review and coding of 398 decisions issued by the Constitutional Court in the context of jurisdictional conflicts between the ordinary criminal justice system and the Military Criminal Justice system, for the purpose of constructing a structured database. This input was complemented by in-depth interviews with lawyers involved in these proceedings, as well as public information requests submitted to the relevant authorities. The report, along with its methodological annex and codebook, is available at https://www.amnesty.org/. The database itself is also available for consultation in this GitHub repository, along with the code used for its processing.
 
